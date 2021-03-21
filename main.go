@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +38,7 @@ import (
 	"github.com/fluxcd/notification-controller/api/v1beta1"
 	"github.com/fluxcd/notification-controller/controllers"
 	"github.com/fluxcd/notification-controller/internal/server"
+	"github.com/sethvargo/go-limiter/memorystore"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -140,14 +142,17 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	ctx := ctrl.SetupSignalHandler()
+	store, err := memorystore.New(&memorystore.Config{
+		Interval: 10 * time.Minute,
+	})
 
 	setupLog.Info("starting event server", "addr", eventsAddr)
 	eventServer := server.NewEventServer(eventsAddr, log, mgr.GetClient())
-	go eventServer.ListenAndServe(ctx.Done())
+	go eventServer.ListenAndServe(ctx.Done(), store)
 
 	setupLog.Info("starting webhook receiver server", "addr", receiverAddr)
 	receiverServer := server.NewReceiverServer(receiverAddr, log, mgr.GetClient())
-	go receiverServer.ListenAndServe(ctx.Done())
+	go receiverServer.ListenAndServe(ctx.Done(), store)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

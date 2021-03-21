@@ -18,12 +18,19 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/sethvargo/go-limiter"
+	"github.com/sethvargo/go-limiter/httplimit"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/fluxcd/pkg/recorder"
 )
 
 // EventServer handles event POST requests
@@ -43,10 +50,13 @@ func NewEventServer(port string, logger logr.Logger, kubeClient client.Client) *
 }
 
 // ListenAndServe starts the HTTP server on the specified port
-func (s *EventServer) ListenAndServe(stopCh <-chan struct{}) {
+func (s *EventServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store) error {
+	middleware, err := httplimit.NewMiddleware(store, eventKeyFunc)
+	if err != nil {
+		return err
+	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.handleEvent())
-
+	mux.Handle("/", middleware.Handle(http.HandlerFunc(s.handleEvent())))
 	srv := &http.Server{
 		Addr:    s.port,
 		Handler: mux,
@@ -69,4 +79,22 @@ func (s *EventServer) ListenAndServe(stopCh <-chan struct{}) {
 	} else {
 		s.logger.Info("Event server stopped")
 	}
+
+	return nil
+}
+
+func eventKeyFunc(r *http.Request) (string, error) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+	defer r.Body.Close()
+
+	event := &recorder.Event{}
+	err = json.Unmarshal(body, event)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("event/%s/%s", event.InvolvedObject.String(), event.Severity), nil
 }

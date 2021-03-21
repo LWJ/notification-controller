@@ -24,9 +24,11 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/sethvargo/go-limiter/memorystore"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -127,10 +129,14 @@ var _ = Describe("Event handlers", func() {
 		Expect(k8sClient.Create(ctx, &provider)).To(Succeed())
 
 		By("Creating and starting event server")
+		store, err := memorystore.New(&memorystore.Config{
+			Interval: 10 * time.Minute,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
 		// TODO let OS assign port number
 		eventServer := server.NewEventServer("127.0.0.1:56789", logf.Log, k8sClient)
 		stopCh = make(chan struct{})
-		go eventServer.ListenAndServe(stopCh)
+		go eventServer.ListenAndServe(stopCh, store)
 	})
 
 	AfterEach(func() {
