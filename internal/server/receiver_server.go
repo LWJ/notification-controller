@@ -49,10 +49,11 @@ func NewReceiverServer(port string, logger logr.Logger, kubeClient client.Client
 }
 
 // ListenAndServe starts the HTTP server on the specified port
-func (s *ReceiverServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store) error {
+func (s *ReceiverServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store) {
 	middleware, err := httplimit.NewMiddleware(store, receiverKeyFunc)
 	if err != nil {
-		return err
+		s.logger.Error(err, "Receiver server crashed")
+		os.Exit(1)
 	}
 	mux := http.DefaultServeMux
 	mux.Handle("/hook/", middleware.Handle(http.HandlerFunc(s.handlePayload())))
@@ -78,8 +79,6 @@ func (s *ReceiverServer) ListenAndServe(stopCh <-chan struct{}, store limiter.St
 	} else {
 		s.logger.Info("Receiver server stopped")
 	}
-
-	return nil
 }
 
 func receiverKeyFunc(r *http.Request) (string, error) {

@@ -51,10 +51,11 @@ func NewEventServer(port string, logger logr.Logger, kubeClient client.Client) *
 }
 
 // ListenAndServe starts the HTTP server on the specified port
-func (s *EventServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store) error {
+func (s *EventServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store) {
 	middleware, err := httplimit.NewMiddleware(store, eventKeyFunc)
 	if err != nil {
-		return err
+		s.logger.Error(err, "Event server crashed")
+		os.Exit(1)
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", middleware.Handle(http.HandlerFunc(s.handleEvent())))
@@ -80,8 +81,6 @@ func (s *EventServer) ListenAndServe(stopCh <-chan struct{}, store limiter.Store
 	} else {
 		s.logger.Info("Event server stopped")
 	}
-
-	return nil
 }
 
 func eventKeyFunc(r *http.Request) (string, error) {
