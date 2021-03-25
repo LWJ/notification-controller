@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -82,6 +83,8 @@ func (s *ReceiverServer) ListenAndServe(stopCh <-chan struct{}, store limiter.St
 }
 
 func receiverKeyFunc(r *http.Request) (string, error) {
-	digest := url.PathEscape(strings.TrimLeft(r.RequestURI, "/hook/"))
-	return fmt.Sprintf("receiver/%s", digest), nil
+	id := url.PathEscape(strings.TrimLeft(r.RequestURI, "/hook/"))
+	val := fmt.Sprintf("receiver/%s", id)
+	digest := sha256.Sum256([]byte(val))
+	return fmt.Sprintf("%x", digest), nil
 }

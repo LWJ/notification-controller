@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Flux authors
+Copyright 2021 The Flux authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,6 +51,7 @@ func TestEventKeyFunc(t *testing.T) {
 	tests := []struct {
 		involvedObject corev1.ObjectReference
 		severity       string
+		message        string
 		rateLimit      bool
 	}{
 		{
@@ -60,6 +62,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "1",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: false,
 		},
 		{
@@ -70,6 +73,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "1",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: true,
 		},
 		{
@@ -80,6 +84,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "1",
 			},
 			severity:  recorder.EventSeverityError,
+			message:   "Health check timed out for [Deployment 'foo/bar']",
 			rateLimit: false,
 		},
 		{
@@ -90,6 +95,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "1",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: false,
 		},
 		{
@@ -100,6 +106,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "2",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: false,
 		},
 		{
@@ -110,6 +117,7 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "3",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: false,
 		},
 		{
@@ -120,14 +128,16 @@ func TestEventKeyFunc(t *testing.T) {
 				Namespace:  "2",
 			},
 			severity:  recorder.EventSeverityInfo,
+			message:   "Health check passed",
 			rateLimit: true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.involvedObject.String(), func(t *testing.T) {
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%v", i), func(t *testing.T) {
 			event := recorder.Event{
 				InvolvedObject: tt.involvedObject,
 				Severity:       tt.severity,
+				Message:        tt.message,
 			}
 			eventData, err := json.Marshal(event)
 			g.Expect(err).ShouldNot(gomega.HaveOccurred())

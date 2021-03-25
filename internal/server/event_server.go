@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -96,5 +97,7 @@ func eventKeyFunc(r *http.Request) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("event/%s/%s", event.InvolvedObject.String(), event.Severity), nil
+	val := fmt.Sprintf("event/%s/%s/%s/%s", event.InvolvedObject.Name, event.InvolvedObject.Namespace, event.InvolvedObject.Kind, event.Message)
+	digest := sha256.Sum256([]byte(val))
+	return fmt.Sprintf("%x", digest), nil
 }
